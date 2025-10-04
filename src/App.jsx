@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { ISLANDS, findIslandLevel, getNextLevelRef, islandStatusLabel } from "./data.js";
 import island1 from "./assets/island 1.png";
 import island2 from "./assets/island 2.png";
-import insideIsle from "./assets/insideisle.png";
+import isleExpanded from "./assets/isleexpanded.png";
 import { ArrayVisualizer } from "./visualizers.jsx";
 
 function Brand() {
@@ -61,15 +61,19 @@ function IslandDetail({ island, progress, onBack, onEnterLevel }) {
   const lackeyImgs = Object.values(import.meta.glob("./assets/lackeys/*.{png,jpg,jpeg,webp,gif}", { eager: true, as: "url" }));
   const generalImgs = Object.values(import.meta.glob("./assets/generals/*.{png,jpg,jpeg,webp,gif}", { eager: true, as: "url" }));
   const generalImg = generalImgs[0];
-  // Node positions (rough curve across the map)
+  // Node positions (rough curve across the map). Provide up to 6 for Contigua.
   const nodes = [
     { left: "10%", top: "65%" },
-    { left: "30%", top: "45%" },
-    { left: "50%", top: "60%" },
-    { left: "70%", top: "40%" },
-    { left: "86%", top: "58%" },
+    { left: "28%", top: "45%" },
+    { left: "46%", top: "60%" },
+    { left: "64%", top: "40%" },
+    { left: "80%", top: "58%" },
+    { left: "92%", top: "45%" },
   ];
-  const bg = island.id === "primus" ? insideIsle : insideIsle;
+  const bg = isleExpanded;
+  console.log("Lackeys loaded:", import.meta.glob("./assets/lackeys/*.{png,jpg,jpeg,webp,gif}", { eager: true, as: "url" }));
+console.log("Generals loaded:", import.meta.glob("./assets/generals/*.{png,jpg,jpeg,webp,gif}", { eager: true, as: "url" }));
+
   return (
     <div className="isle-detail">
       <div className="level-top row">
@@ -82,9 +86,9 @@ function IslandDetail({ island, progress, onBack, onEnterLevel }) {
         {nodes.slice(0, -1).map((p, i) => (
           <div key={`route-${i}`} className="route" data-from={i} data-to={i + 1} />
         ))}
-        {island.levels.slice(0, 5).map((lvl, i) => {
+        {island.levels.slice(0, nodes.length).map((lvl, i) => {
           const locked = false; // temporarily unlock all levels
-          const isBoss = !!lvl.boss || i === 4;
+          const isBoss = !!lvl.boss || i === island.levels.slice(0, nodes.length).length - 1;
           const badgeImg = isBoss ? generalImg : lackeyImgs[i % lackeyImgs.length];
           const pos = nodes[i];
           return (
@@ -101,7 +105,11 @@ function IslandDetail({ island, progress, onBack, onEnterLevel }) {
                   <div className="badge-name">{island.general?.name || "General"}</div>
                 ) : (
                   <div className="lackey-name">{
-                    (["integer","string","float","boolean"][i] || "lackey") + " level"
+                    (island.id === "primus"
+                      ? (["integer","string","float","boolean"][i] || "lackey")
+                      : island.id === "contigua"
+                        ? (["insert","delete","search","sort","traverse"][i] || "lackey")
+                        : "lackey") + " level"
                   }</div>
                 )}
               </div>
@@ -131,7 +139,7 @@ function Map({ progress, onEnterIsland, onBack }) {
         <div className="island-row">
           {ISLANDS.map((isl, idx) => {
             const cleared = progress.clearedIslands.has(isl.id);
-            const unlocked = idx === 0 || progress.clearedIslands.has(ISLANDS[idx - 1].id);
+            const unlocked = idx === 0 || isl.id === "contigua" || progress.clearedIslands.has(ISLANDS[idx - 1].id);
             return (
               <MapIsland key={isl.id} island={isl} cleared={cleared} unlocked={unlocked} onEnter={onEnterIsland} />
             );
@@ -171,21 +179,39 @@ function Visualizer({ islandId, levelId, config }) {
   return <div className="sub">No visualizer for this level.</div>;
 }
 
-function Level({ user, island, level, onResult, onLoseLife, lives, onBack }) {
+function Level({ user, island, level, onResult, onLoseLife, lives, onBack, onVictory }) {
   const [code, setCode] = useState(level.starterCode || "/* Write C code only */\n#include <stdio.h>\nint main(){\n  // Your code here\n  return 0;\n}\n");
   const [userInput, setUserInput] = useState(level.test.input);
   const [userOutput, setUserOutput] = useState("");
   const [runMsg, setRunMsg] = useState("");
+  const [showVictory, setShowVictory] = useState(false);
 
-  const run = () => {
-    // Stub runner: compare userOutput to expected output exactly (trimmed)
-    const expected = (level.test.expected || "").trim();
-    const actual = (userOutput || "").trim();
-    if (actual === expected) {
-      setRunMsg("Correct! Lackey defeated.");
-      onResult(true);
-    } else {
-      setRunMsg("Wrong output. You lost a life.");
+  const run = async () => {
+    try {
+      setRunMsg("Running on backend...");
+      const resp = await fetch("http://localhost:3000/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: "c", code, stdin: level.test.input || "" }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        setRunMsg(`Runner error: ${data.error || resp.statusText}`);
+        onLoseLife();
+        return;
+      }
+      const expected = (level.test.expected || "").trim();
+      const actual = (data.stdout || "").trim();
+      if (actual === expected) {
+        setRunMsg("Correct! Lackey defeated.");
+        onResult(true);
+        setShowVictory(true);
+      } else {
+        setRunMsg(`Wrong output.\nExpected:\n${expected}\nGot:\n${actual}\nStderr:\n${data.stderr || ""}`);
+        onLoseLife();
+      }
+    } catch (e) {
+      setRunMsg(`Runner failed: ${String(e)}`);
       onLoseLife();
     }
   };
@@ -229,7 +255,7 @@ function Level({ user, island, level, onResult, onLoseLife, lives, onBack }) {
           <textarea className="code-editor" value={code} onChange={(e) => setCode(e.target.value)} />
           <div className="row">
             <button className="btn primary" onClick={run}>Run</button>
-            <div className="sub">Runner is simulated. We'll add a real C runner later.</div>
+            <div className="sub">Runner is powered by backend now.</div>
           </div>
           <div className="io-grid" style={{ marginTop: 8 }}>
             <div>
@@ -243,18 +269,32 @@ function Level({ user, island, level, onResult, onLoseLife, lives, onBack }) {
           </div>
         </div>
       </div>
+
+      {showVictory && (
+        <div className="modal-backdrop">
+          <div className="modal card">
+            <h3 className="title">Lackey defeated!</h3>
+            <div className="body">
+              <JackBox title="Jack" text={"Well fought! The path ahead is unlocked. Sail on to the next point on the map."} />
+            </div>
+            <div className="actions">
+              <button className="btn accent" onClick={() => { setShowVictory(false); onVictory && onVictory(); }}>Return to Map</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function App() {
-  const [screen, setScreen] = useState("intro"); // intro | map | island | level
   const [username] = useState("Captain"); // stubbed test user
   const [progress, setProgress] = useState({
     clearedIslands: new Set(),
     islandLevels: {}, // { [islandId]: { levelIdx: number, lives: number } }
   });
   const [currentRef, setCurrentRef] = useState(null); // { islandId, levelId }
+  const [screen, setScreen] = useState("intro"); // default screen when app starts
 
   const enterMap = () => setScreen("map");
 
@@ -309,14 +349,7 @@ export default function App() {
       newSet.add(island.id);
       return { ...p, clearedIslands: newSet };
     });
-
-    if (nextRef) {
-      setCurrentRef(nextRef);
-    } else {
-      // show map and congrats
-      alert(`Well done! ${island.name} is liberated.`);
-      setScreen("map");
-    }
+    // do not navigate here; Level will show victory popup and then call onVictory
   };
 
   if (screen === "intro") {
@@ -356,6 +389,7 @@ export default function App() {
         onLoseLife={onLoseLife}
         onResult={onResult}
         onBack={() => setScreen("map")}
+        onVictory={() => { setCurrentRef({ islandId: island.id, levelId: null }); setScreen("island"); }}
       />
     );
   }
