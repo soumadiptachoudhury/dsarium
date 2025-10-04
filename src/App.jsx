@@ -4,7 +4,7 @@ import { ISLANDS, findIslandLevel, getNextLevelRef, islandStatusLabel } from "./
 import { ArrayVisualizer } from "./visualizers.jsx";
 
 function Brand() {
-  return <div className="brand">DSARIUM ▸ Retro Pirate DSA</div>;
+  return <div className="brand"></div>;
 }
 
 function Intro({ onStart, username }) {
@@ -17,7 +17,6 @@ function Intro({ onStart, username }) {
       </div>
       <div className="intro-body">
         <div className="intro-panel card">
-          <div className="jack-avatar" />
           <div className="dialog">
             <p>
               Ahoy, {username || "Sailor"}! I be Jack, your trusty pirate guide. The seas be cursed by the demon king
@@ -26,15 +25,15 @@ function Intro({ onStart, username }) {
               the dark castle and face the demon king himself!
             </p>
           </div>
+          <div className="intro-actions">
+            <button className="btn accent" onClick={onStart}>Sail to the Map</button>
+          </div>
+          <div className="jack-avatar" />
         </div>
-      </div>
-      <div className="intro-actions">
-        <button className="btn accent" onClick={onStart}>Sail to the Map</button>
       </div>
     </div>
   );
 }
-
 function MapIsland({ island, cleared, unlocked, onEnter }) {
   const cls = cleared ? "island cleared" : unlocked ? "island unlocked" : "island locked";
   return (
@@ -46,10 +45,14 @@ function MapIsland({ island, cleared, unlocked, onEnter }) {
   );
 }
 
-function Map({ progress, onEnterIsland }) {
+function Map({ progress, onEnterIsland, onBack }) {
   return (
     <div className="map">
-      <Brand />
+      <div className="level-top row">
+        <Brand />
+        <div style={{ flex: 1 }} />
+        <button className="btn" onClick={onBack}>Back</button>
+      </div>
       <div className="sea">
         <div className="island-row">
           {ISLANDS.map((isl, idx) => {
@@ -94,7 +97,7 @@ function Visualizer({ islandId, levelId, config }) {
   return <div className="sub">No visualizer for this level.</div>;
 }
 
-function Level({ user, island, level, onResult, onLoseLife, lives }) {
+function Level({ user, island, level, onResult, onLoseLife, lives, onBack }) {
   const [code, setCode] = useState(level.starterCode || "/* Write C code only */\n#include <stdio.h>\nint main(){\n  // Your code here\n  return 0;\n}\n");
   const [userInput, setUserInput] = useState(level.test.input);
   const [userOutput, setUserOutput] = useState("");
@@ -118,6 +121,7 @@ function Level({ user, island, level, onResult, onLoseLife, lives }) {
       <div className="level-top row">
         <Brand />
         <div style={{ flex: 1 }} />
+        <button className="btn" onClick={onBack}>Back</button>
         <Lives lives={lives} />
       </div>
       <div className="level-grid">
@@ -248,7 +252,7 @@ export default function App() {
   }
 
   if (screen === "map") {
-    return <Map progress={progress} onEnterIsland={enterIsland} />;
+    return <Map progress={progress} onEnterIsland={enterIsland} onBack={() => setScreen("intro")} />;
   }
 
   if (screen === "level" && current) {
@@ -264,6 +268,7 @@ export default function App() {
         lives={lives}
         onLoseLife={onLoseLife}
         onResult={onResult}
+        onBack={() => setScreen("map")}
       />
     );
   }
