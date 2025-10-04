@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from "react";
 
 import { ISLANDS, findIslandLevel, getNextLevelRef, islandStatusLabel } from "./data.js";
+import island1 from "./assets/island 1.png";
+import island2 from "./assets/island 2.png";
+import insideIsle from "./assets/insideisle.png";
 import { ArrayVisualizer } from "./visualizers.jsx";
 
 function Brand() {
@@ -36,11 +39,82 @@ function Intro({ onStart, username }) {
 }
 function MapIsland({ island, cleared, unlocked, onEnter }) {
   const cls = cleared ? "island cleared" : unlocked ? "island unlocked" : "island locked";
+  const bg = island.id === "primus" ? island1 : island.id === "contigua" ? island2 : null;
+  const style = {
+    cursor: unlocked ? "pointer" : "not-allowed",
+    backgroundImage: bg ? `url(${bg})` : undefined,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+  };
   return (
-    <div className={`${cls} card`} onClick={() => unlocked && onEnter(island.id)} style={{ cursor: unlocked ? "pointer" : "not-allowed" }}>
+    <div className={`${cls} card`} onClick={() => unlocked && onEnter(island.id)} style={style}>
       <div className="name">{island.name}</div>
       <div className="status">{islandStatusLabel(island)}</div>
       {island.boss && <div className="boss-badge">General {island.boss.name}</div>}
+    </div>
+  );
+}
+
+function IslandDetail({ island, progress, onBack, onEnterLevel }) {
+  const unlockedIdx = (progress.islandLevels[island.id]?.levelIdx ?? 0);
+  // Preload lackey and general images (eager URLs)
+  const lackeyImgs = Object.values(import.meta.glob("./assets/lackeys/*.{png,jpg,jpeg,webp,gif}", { eager: true, as: "url" }));
+  const generalImgs = Object.values(import.meta.glob("./assets/generals/*.{png,jpg,jpeg,webp,gif}", { eager: true, as: "url" }));
+  const generalImg = generalImgs[0];
+  // Node positions (rough curve across the map)
+  const nodes = [
+    { left: "10%", top: "65%" },
+    { left: "30%", top: "45%" },
+    { left: "50%", top: "60%" },
+    { left: "70%", top: "40%" },
+    { left: "86%", top: "58%" },
+  ];
+  const bg = island.id === "primus" ? insideIsle : insideIsle;
+  return (
+    <div className="isle-detail">
+      <div className="level-top row">
+        <div className="brand" />
+        <div style={{ flex: 1 }} />
+        <button className="btn" onClick={onBack}>Back</button>
+      </div>
+      <div className="isle-canvas" style={{ backgroundImage: `url(${bg})` }}>
+        {/* routes between nodes */}
+        {nodes.slice(0, -1).map((p, i) => (
+          <div key={`route-${i}`} className="route" data-from={i} data-to={i + 1} />
+        ))}
+        {island.levels.slice(0, 5).map((lvl, i) => {
+          const locked = false; // temporarily unlock all levels
+          const isBoss = !!lvl.boss || i === 4;
+          const badgeImg = isBoss ? generalImg : lackeyImgs[i % lackeyImgs.length];
+          const pos = nodes[i];
+          return (
+            <div key={lvl.id} className="node-wrap" style={{ left: pos.left, top: pos.top }}>
+              <div className="badge">
+                {badgeImg && (
+                  <img
+                    className={isBoss ? "boss-img" : "lackey-img"}
+                    src={badgeImg}
+                    alt={isBoss ? island.general?.name || "General" : "Lackey"}
+                  />
+                )}
+                {isBoss ? (
+                  <div className="badge-name">{island.general?.name || "General"}</div>
+                ) : (
+                  <div className="lackey-name">{
+                    (["integer","string","float","boolean"][i] || "lackey") + " level"
+                  }</div>
+                )}
+              </div>
+              <button
+                className={`node ${locked ? "locked" : "unlocked"} ${isBoss ? "boss" : "lackey"}`}
+                disabled={locked}
+                onClick={() => !locked && onEnterLevel(lvl.id)}
+                title={lvl.title}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -174,7 +248,7 @@ function Level({ user, island, level, onResult, onLoseLife, lives, onBack }) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState("intro"); // intro | map | level
+  const [screen, setScreen] = useState("intro"); // intro | map | island | level
   const [username] = useState("Captain"); // stubbed test user
   const [progress, setProgress] = useState({
     clearedIslands: new Set(),
@@ -185,8 +259,6 @@ export default function App() {
   const enterMap = () => setScreen("map");
 
   const enterIsland = (islandId) => {
-    const island = ISLANDS.find((i) => i.id === islandId);
-    const first = island.levels[0];
     setProgress((p) => ({
       ...p,
       islandLevels: {
@@ -194,8 +266,8 @@ export default function App() {
         [islandId]: p.islandLevels[islandId] || { levelIdx: 0, lives: 5 },
       },
     }));
-    setCurrentRef({ islandId, levelId: first.id });
-    setScreen("level");
+    setCurrentRef({ islandId, levelId: null });
+    setScreen("island");
   };
 
   const stateFor = (islandId) => progress.islandLevels[islandId] || { levelIdx: 0, lives: 5 };
@@ -255,6 +327,21 @@ export default function App() {
     return <Map progress={progress} onEnterIsland={enterIsland} onBack={() => setScreen("intro")} />;
   }
 
+  if (screen === "island" && currentRef) {
+    const island = ISLANDS.find((i) => i.id === currentRef.islandId) || ISLANDS[0];
+    const onEnterLevel = (levelId) => {
+      setCurrentRef({ islandId: island.id, levelId });
+      setScreen("level");
+    };
+    return (
+      <IslandDetail
+        island={island}
+        progress={progress}
+        onBack={() => setScreen("map")} 
+        onEnterLevel={onEnterLevel}
+      />
+    );
+  }
   if (screen === "level" && current) {
     const { island, level, levelIndex } = current;
     const lives = stateFor(island.id).lives ?? 5;

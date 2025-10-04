@@ -208,7 +208,7 @@ a { color: inherit; text-decoration: none; }
   left: auto;
   background: transparent;
   padding: 0;
-  z-index: 3;
+  z-index: 2; /* above dim overlay */
 }
 .map .level-top .brand { display: none; }
 .map .level-top .btn { box-shadow: none; }
@@ -223,24 +223,58 @@ a { color: inherit; text-decoration: none; }
   position: absolute; inset: -40% -20% auto -20%; height: 60%;
   background: radial-gradient(50% 50% at 50% 50%, rgba(255,209,102,0.12) 0%, rgba(255,209,102,0.0) 70%);
   filter: blur(10px);
+  z-index: 0; /* behind content */
 }
-.island-row { height: 100%; display: flex; align-items: center; justify-content: center; gap: 28px; }
+/* Dim the sea background */
+.sea::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(120% 80% at 50% 10%, rgba(0,0,0,0.35), rgba(0,0,0,0.6));
+  pointer-events: none;
+  z-index: 0; /* behind content */
+}
+.island-row { position: relative; z-index: 1; height: 100%; display: flex; align-items: center; justify-content: center; gap: 36px; padding: 0 40px; }
+/* Decorative dotted curved route behind islands */
+.island-row::before {
+  content: "";
+  position: absolute; left: 20px; right: 20px; top: 50%; height: 200px; transform: translateY(-50%);
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="200" viewBox="0 0 1200 200"><path d="M0,120 C200,40 400,200 600,120 S1000,40 1200,120" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="3" stroke-dasharray="6 10" stroke-linecap="round"/></svg>') center/contain no-repeat;
+  opacity: 0.7;
+}
 .island {
   position: relative;
-  width: 220px; height: 160px;
-  border-radius: 20px;
-  display: grid; place-items: center; text-align: center; padding: 10px;
+  width: 280px; height: 200px; /* bigger islands */
+  border-radius: 0; /* remove rounded box look */
+  display: grid; place-items: center; text-align: center; padding: 0;
+  background-color: transparent !important; /* don't override inline background-image */
+  border: none !important; box-shadow: none !important; /* remove box */
   transition: transform .15s ease;
 }
 .island:hover { transform: translateY(-3px); }
-.island .name { font-size: 14px; letter-spacing: 1px; }
-.island .status { font-size: 11px; color: var(--muted); margin-top: 6px; }
-.island.locked { box-shadow: 0 0 0 3px #311416 inset, 0 0 30px var(--aura-red); background: linear-gradient(180deg, #2a0f15 0%, #1c0b0f 100%); border: 1px solid #4b1c22; }
-.island.unlocked { box-shadow: 0 0 0 3px #0e231d inset, 0 0 26px var(--aura-green); background: linear-gradient(180deg, #10322a 0%, #0d221c 100%); border: 1px solid #1e4036; }
-.island.cleared { box-shadow: 0 0 0 2px #2e3b4e inset; background: linear-gradient(180deg, #223045 0%, #1a2435 100%); border: 1px solid #364b68; }
+/* Only show island name on top of image */
+.island .name {
+  position: absolute;
+  top: -40px;
+  left: 50%; transform: translateX(-50%);
+  padding: 4px 8px;
+  font-size: 14px; letter-spacing: 1px;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.6);
+}
+.island .status { display: none !important; }
+.boss-badge { display: none !important; }
+/* Remove box styles from state variants */
+.island.locked, .island.unlocked, .island.cleared { background-color: transparent !important; border: none !important; box-shadow: none !important; }
+
+/* Curvy horizontal path offsets per island (tweak as needed) */
+.island-row .island:nth-child(1) { transform: translateY(0); }
+.island-row .island:nth-child(2) { transform: translateY(-18px); }
+.island-row .island:nth-child(3) { transform: translateY(10px); }
+.island-row .island:nth-child(4) { transform: translateY(-22px); }
+.island-row .island:nth-child(5) { transform: translateY(12px); }
 
 .boss-badge {
-  position: absolute; top: 8px; right: 10px; font-size: 10px; padding: 4px 6px; border-radius: 6px; background: #3b2b1a; color: #ffd166; border: 1px solid #7a5a2a;
+  margin-bottom:100px;position: absolute; top: 8px; right: 10px; font-size: 10px; padding: 4px 6px; border-radius: 6px; background: #3b2b1a; color: #ffd166; border: 1px solid #7a5a2a;
 }
 
 /* Level Layout */
@@ -306,3 +340,72 @@ pre.output { min-height: 120px; max-height: 220px; overflow: auto; }
 .passengers { position: relative; display: flex; gap: 6px; }
 .pax { width: 26px; height: 26px; border-radius: 6px; background: #ffd166; border: 1px solid #7a5a2a; color: #281d0a; display: grid; place-items: center; font-size: 12px; }
 .pax.highlight { background: #06d6a0; border-color: #1d6f5b; color: #081a16; }
+
+/* Island Detail (inside isle map) */
+.isle-detail { min-height: 100vh; display: grid; grid-template-rows: 1fr; position: relative; }
+/* Overlay Back button at top-right with no strip */
+.isle-detail .level-top {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  left: auto;
+  background: transparent;
+  padding: 0;
+  z-index: 3;
+}
+.isle-detail .level-top .brand { display: none; }
+.isle-canvas {
+  position: relative;
+  height: 100%;
+  margin: 0;
+  background: center/cover no-repeat;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+/* Dotted route path behind nodes */
+.isle-canvas::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520"><path d="M40,360 C240,180 520,420 720,300 S1000,180 1160,320" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="4" stroke-dasharray="8 12" stroke-linecap="round"/></svg>') center/110% no-repeat;
+  opacity: 0.85;
+  z-index: 1; /* above dim, below nodes */
+}
+.isle-canvas::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(120% 80% at 50% 10%, rgba(0,0,0,0.25), rgba(0,0,0,0.6));
+  pointer-events: none;
+  z-index: 0; /* dims only the background */
+}
+.route { display: none; }
+.node-wrap {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 2; /* above dim and route */
+}
+.badge { position: relative; margin-bottom: 6px; }
+.badge img {
+  width: 96px; height: 96px; /* default for lackeys */
+  object-fit: cover;
+  image-rendering: pixelated;
+  border-radius: 6px;
+  box-shadow: none; /* remove hard border */
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.85))
+          drop-shadow(0 0 24px rgba(255,255,255,0.45)); /* soft white glow */
+}
+.badge .boss-img { width: 200px; height: 200px; }
+.badge-name { font-size: 12px; margin-top: 4px; color: var(--text); text-shadow: 0 1px 0 #000; }
+.lackey-name { font-size: 12px; margin-top: 4px; color: #e5e7eb; text-shadow: 0 1px 0 #000; text-transform: capitalize; }
+.node {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #111827;
+  box-shadow: 0 0 0 4px #e5e7eb; /* pixel-art ring */
+  cursor: pointer;
+}
+.node.unlocked:hover { filter: brightness(0.95); transform: scale(1.02); }
+.node.locked { cursor: not-allowed; box-shadow: 0 0 0 4px #e5e7eb, 0 0 16px rgba(255,59,59,0.7); }
+.node.boss { background: #ffd166; }
